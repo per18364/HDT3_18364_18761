@@ -5,8 +5,101 @@ date: "2023-03-06"
 output: pdf_document
 ---
 
+# Hoja de Trabajo 3
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+library(ModelMetrics)
+library(tidyverse)
+library(corrplot)
+library(nortest)
+library(caret)
+library(dplyr)
 ```
+
+### 1.
+
+```{r}
+datosT <- read.csv("train.csv")
+```
+
+### 4. Divida el set de datos preprocesados en dos conjuntos: Entrenamiento y prueba. Describa el criterio que usó para crear los conjuntos: número de filas de cada uno, estratificado o no, balanceado o no, etc. Si le proveen un conjunto de datos de prueba y tiene suficientes datos, tómelo como de validación, pero haga sus propios conjuntos de prueba. 
+
+```{r}
+set_entrenamiento <- sample_frac(datosT, .7)
+set_prueba <-setdiff(datosT, set_entrenamiento)
+drop <- c("LotFrontage", "Alley", "MasVnrType", "MasVnrArea", "BsmtQual", "BsmtCond", "BsmtExposure", "BsmtFinType1", "BsmtFinType2", "Electrical", "FireplaceQu", "GarageType", "GarageYrBlt", "GarageFinish", "GarageQual", "GarageCond", "PoolQC", "Fence", "MiscFeature")
+set_entrenamiento <- set_entrenamiento[, !(names(set_entrenamiento) %in% drop)]
+set_prueba <- set_prueba[, !(names(set_prueba) %in% drop)]
+```
+
+La division de los sets se decidió por porcentajes de 70% para entrenamiento y 30% para prueba.
+
+
+### 8. Haga un modelo de regresión lineal con todas las variables numéricas para predecir el precio de las casas. Analice el modelo (resumen, residuos, resultados de la predicción). Muestre el modelo gráficamente.  
+
+```{r analisis}
+set.seed(123)
+porciento <- 70/100
+datosT$clasificacion <- ifelse(datosT$SalePrice <= 251000, "Economicas", ifelse(datosT$SalePrice <= 538000, "Intermedias", ifelse(datosT$SalePrice <= 755000, "Caras")))
+datosT$y <- as.numeric(factor(datosT$clasificacion))
+datos <- datosT[,c(2,4,18,19,20,21,27,35,37,38,39,44,45,46,47,48,49,50,51,52,53,55,57,60,62,63,67,68,69,70,71,72,76,77,78,81,83)]
+datos <- datos[,colSums(is.na(datos))==0]
+set.seed(123)
+trainRowsNumber<-sample(nrow(datos),porciento*nrow(datos))
+train<-datos[trainRowsNumber,]
+test<-datos[-trainRowsNumber,]
+#train$y<- as.numeric(factor(datos$clasificacion))
+fitLM<-lm(SalePrice~., data = train) #modelo
+summary(fitLM)
+plot(fitLM)
+```
+
+### 9. Analice el modelo. Determine si hay multicolinealidad entre las variables, y cuáles son las que aportan al modelo, por su valor de significación. Haga un análisis de correlación de las características del modelo y especifique si el modelo se adapta bien a los datos. Explique si hay sobreajuste (overfitting) o no. En caso de existir sobreajuste, haga otro modelo que lo corrija. 
+
+```{r}
+corrplot(cor(datos), method = "circle")
+```
+En su mayoría, la correlación lineal de las variables es baja, pero en algunos casos, se pueden ver valores altos. Esto demuestra que el modelo se adapta bien a los datos con los que está trabajando y hay multicolinealidad entre algunas vaiables. De igual manera, debido a la cantidad de correlaciones obtenidas, se puede concluir que no hay presencia de uverfitting en el modelo.
+
+### 10. Si tiene multicolinealidad o sobreajuste, haga un modelo con las variables que sean mejores predictoras del precio de las casas. Determine la calidad del modelo realizando un análisis de los residuos. Muéstrelo gráficamente. 
+
+```{r}
+plot(fitLM)
+```
+La primera grafica muestra si los residuos tienen patrones no lineales, pero de forma visual no se puede identificar si hay algun patrón que indique la presencia de relaciones no lineales, mostrando residuos a lo largo de la gráfica.
+
+La segunda gráfica muestra si los residuos tienen una distribución normal. La mayoría de cuantiles se encuentran alineados o muy cerca de la diagonal, lo que muestra que la distribución es normal.
+
+La tercera gráfica analiza la varianza, determinando si se muestra homocedasticidad o heterocedasticidad. La mayoria de los datos se encuentran en una distribución aceptable desde 1e+05 hasta 4e+05 aunque algunos datos en el extremo derecho se comportan de manera distinta, a pesar de eso, estos datos representan un porcentaje menor por lo que se puede concluir que en este caso se presenta homocedasticidad.
+
+La cuarta gráfica busca identificar casos que podrían influenciar la linea de regresión. En el gráfico realizado se pueden identificar dos casos que pueden representar un impacto (1183 y 1299).
+
+
+### 11. Utilice cada modelo con el conjunto de prueba y determine la eficiencia del algoritmo para predecir el precio de las casas. ¿Qué tan bien lo hizo? 
+
+```{r}
+prediction <- fitLM %>% predict(test)
+data.frame(RMSE = RMSE(prediction, test$SalePrice), R2 = R2(prediction, test$SalePrice))
+ 
+anova(fitLM)
+```
+R2 representa la correlación del modelo, mientras más cercano es el resultado a 1, más adecuado es el modelo, el 0.85 que se obtuvo es muy bueno. En el otro cuadro, se realizo un partial f-tes, el cual indica si las variables independientes son lo bastante adecuadas para ser consideradas en el modelo de regresion lineal. Aqui la columna que nos interesa es Pr(>F) esta nos indica que mientras mas bajo es la cifra, mas adecuada es la variable, tenemos 3 variables como YearBuilt, TotRmsAbvGrd y GarageCars, las cuales obtuvieron un valor bastante alto y atipico, por lo que eso pudo afectar a la correlacion del modelo. 
+
+
+### 12. Discuta sobre la efectividad de los modelos. ¿Cuál lo hizo mejor? ¿Cuál es el mejor modelo para predecir el precio de las casas? Haga los gráficos que crea que le pueden ayudar en la discusión. 
+
+```{r}
+plot(train$SalePrice, col="green")
+```
+Para discutir la efectividad del modelo podemos ver el summary del modelo (se encuentra al final de las graficas de correlacion, antes de las graficas de residuo), podemos ver que al final de toda la informacion tenemos Multiple R-squared, este nos dio un 0.8, el cual es parecido a la cantidad obtenida anteriormente en la tabla de analisis de varianza. Por lo que se puede decir que el modelo podria mejorarse pero es bastante bueno. 
+
+
+
+
+
+
+
+
 
 
