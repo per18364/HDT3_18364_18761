@@ -1,9 +1,16 @@
 ---
-title: "Ejercicios_18364_18761"
+title: "HDT1"
 author: "Jorge Perez y Diego Ruiz"
-date: "2023-03-06"
-output: pdf_document
+date: "2023-03-02"
+output:
+  html_document: default
+  pdf_document: default
 ---
+
+###Universidad del Valle de Guatemala
+###Mineria de datos
+###Jorge Perez - 18364
+###Diego Ruiz - 18761
 
 # Hoja de Trabajo 3
 
@@ -15,12 +22,212 @@ library(corrplot)
 library(nortest)
 library(caret)
 library(dplyr)
+library(ggplot2)
+library(graphics)
+library(fpc)
+library (cluster)
+library (vegan)
 ```
 
-### 1.
+```{r}
+train <- read.csv("train.csv")
+datos<- read.csv("./train.csv", stringsAsFactors = FALSE)
+train <-select(datos, LotFrontage, LotArea, YearBuilt, YearRemodAdd, MasVnrArea, BsmtFinSF1,BsmtFinSF2,BsmtUnfSF,TotalBsmtSF,X1stFlrSF,X2ndFlrSF,LowQualFinSF,GrLivArea,TotRmsAbvGrd,Fireplaces,GarageYrBlt,GarageCars,GarageArea,WoodDeckSF,OpenPorchSF,EnclosedPorch,ScreenPorch,PoolArea,MoSold,YrSold,SalePrice)
+train <- na.omit(train)
+datosT <- read.csv("train.csv")
+```
+
+### 2. Análisis Exploratorio
+```{r}
+head(train)
+summary(train)
+nrow(train)
+ncol(train)
+str(train)
+table(unlist(lapply(train, class)))
+```
+
+Encontramos que, de las variables de la base de datos, se encuentran 43 de tipo character y 38 integer. 
+
+
+## Analisis de las variables.
+A continuacion se realizara el analisis de variables numericas que nos puedan decir un poco mas sobre los datos en general. 
+
+La variable LotArea es una variable que describe el tamaño de la propiedad en pies cuadrados. Se nota un sesgo positivo, los datos no se encuentran normalizados y no se puede encontrar una relacion directa con el precio de venta. 
 
 ```{r}
-datosT <- read.csv("train.csv")
+plot(train$LotArea, train$SalePrice)
+hist(train$LotArea)
+qqnorm(train$LotArea)
+qqline(train$LotArea, col='red')
+```
+
+En este caso, podemos observar que la mayoría de casas se encuentra debajo de los 50,000 pies cuadrados y que la propiedad con mayor área de lote cuenta con más de 200,000 pies cuadrados.
+
+```{r grfBldngCss, echo=FALSE}
+barplot(train$LotArea, xlab= "Lote", ylab = "Metros cuadrados", main="Tamaño del lote en metros cuadrados")
+```
+
+Las propiedades con construcciones de 1 y 2 niveles son de lejos las mas comunes, siendo de estas dos, la de 1 nivel mucho mas recurrente.
+
+```{r echo=FALSE}
+df <- as.data.frame(train$HouseStyle)
+tipo_vivienda <-train$HouseStyle
+mostrar <- (ggplot(data=df, aes(x=tipo_vivienda)) + geom_bar(stat="count", width=0.7, fill = "steelblue")+theme_minimal())
+print(mostrar + ggtitle("Tipo de vivienda"))
+```
+
+
+La variable YearBuilt nos dice el año en que se realizo la construccion de la propiedad. Es la primera de las variables que muestra un sesgo negativo. Sus datos no estan completamente normalizados por lo que no se puede afirmar una relación total de esta variable con el precio de venta. No obetsnate, se puede afirmar que en los ultimos años el precio de venta ha aumentado considereablemente.
+
+```{r}
+plot(train$YearBuilt, train$SalePrice)
+hist(train$YearBuilt)
+qqnorm(train$YearBuilt)
+qqline(train$YearBuilt, col='red')
+```
+```{r echo=FALSE}
+plot(x = train$YearBuilt, y= train$SalePrice, xlab= "YearBuilt", ylab= "SalePrice", main = "Correlation SalePrice vs YearBuilt")
+abline(lm(train$SalePrice ~ train$YearBuilt), col = "red")
+```
+
+La variable YearRemodAdd nos dice el año en que se realizo la remodelacion de la propiedad, la variable, por su lado, no muestra datos significativos, además de no mostrar datos normalizados y no tener una relacion directa con el precio. 
+
+```{r}
+plot(train$YearRemodAdd, train$SalePrice)
+hist(train$YearRemodAdd)
+qqnorm(train$YearRemodAdd)
+qqline(train$YearRemodAdd, col='red')
+```
+
+La variable MasVnrArea describe en pies cuadrados el tamaño de la construccion dentro de la propiedad. Se puede observar un sesgo positivo pero los dato no estan normalizados, por lo cual no tienen una relación directa con el precio de venta.
+
+```{r}
+plot(train$MasVnrArea, train$SalePrice)
+hist(train$MasVnrArea)
+qqnorm(train$MasVnrArea)
+qqline(train$MasVnrArea, col='red')
+```
+
+La variable TotalBsmtSF nos da la cantidad de pies cuadrados totales que tiene de sotano la propiedad. La variable presenta un ligero sesgo positivo pero en general es bastante simetrica. Contiene datos normalizados y se puede afirmar una relación directa con el precio de la propiedad.
+
+```{r}
+plot(train$TotalBsmtSF, train$SalePrice)
+hist(train$TotalBsmtSF)
+qqnorm(train$TotalBsmtSF)
+qqline(train$TotalBsmtSF, col='red')
+```
+```{r echo=FALSE}
+df <- as.data.frame(train$TotalBsmtSF)
+metros_cuadrados_sotano <-train$TotalBsmtSF
+mostrar <- ggplot(data=df, aes(x=metros_cuadrados_sotano)) + geom_bar(stat="count", width=0.7, fill = "blue")+theme_minimal()
+print(mostrar + ggtitle("TotalBsmtSF"))
+plot(x = train$TotalBsmtSF, y= train$SalePrice, xlab= "TotalBsmtSF", ylab= "SalePrice", main = "Correlation SalePrice vs TotalBsmtSF")
+abline(lm(train$SalePrice ~ train$TotalBsmtSF), col = "red")
+```
+```{r echo=FALSE}
+df <- as.data.frame(train$GarageCars)
+garage_carros <- train$GarageCars
+mostrar <- ggplot(data=df, aes(x=garage_carros)) + geom_bar(stat="count", width=0.7, fill = "steelblue")+theme_minimal()
+print(mostrar + ggtitle("GarageCars"))
+plot(x = train$GarageCars, y= train$SalePrice, xlab= "GarageCars", ylab= "SalePrice", main = "Correlation entre SalePrice y GarageCars")
+abline(lm(train$SalePrice ~ train$GarageCars), col = "red")
+```
+
+La variable GarageArea nos indica el tamaño presentado en pies cuadrados del garage de la propiedad, esto nos da una idea de la cantidad de carros que caben dentro del mismo. Se puede observar que los datos tienen un pequeño sesgo positivo pero gran parte de esto se debe a que hay muchos datos en 0. Los datos estan normalizados en su mayoria y existe una relacion clara con el precio de venta. 
+
+```{r}
+plot(train$GarageArea, train$SalePrice)
+hist(train$GarageArea)
+qqnorm(train$GarageArea)
+qqline(train$GarageArea, col='red')
+```
+
+La variable PoolArea nos dice el area en pies cuadrados de la piscina de la propiedad si la tuviere. La gran mayoria de las propiedades no tiene una piscina por lo que el sesgo es extremadamente positivo, los datos no estan nada normalizados y por existir solo unos cuantos datos distintos a 0, y que si estan ordenados, no son suficientes para afirmar una relacion entre esto y el precio de venta. 
+
+```{r}
+plot(train$PoolArea, train$SalePrice)
+hist(train$PoolArea)
+qqnorm(train$PoolArea)
+qqline(train$PoolArea, col='red')
+```
+
+La variable YrSold es una variable que indica el año que se produjo la venta de la propiedad. Se puede observar que los datos son categoricos por lo que no tienen una relacion directa con el precios de venta. Se puede decir que en 2009 fue el año con mas ventas. 
+
+
+```{r}
+plot(train$YrSold, train$SalePrice)
+hist(train$YrSold)
+qqnorm(train$YrSold)
+qqline(train$YrSold, col='red')
+```
+
+### 3. Análisis de Grupos
+```{r}
+# con k-medias
+cluster <- train
+km<-kmeans(train,3)
+train$grupo<-km$cluster
+plotcluster(cluster,km$cluster) #Realiza una grafica con la ubicación de los clusters
+#Usando el método de la silueta para las k-medias
+silkm<-silhouette(km$cluster,dist(train))
+mean(silkm[,3]) #Silueta de 0.561677
+g1<- train[train$grupo==1,]
+prop.table(table(g1$Species))*100
+g2<- train[train$grupo==2,]
+prop.table(table(g2$Species))*100
+g3<- train[train$grupo==3,]
+prop.table(table(g3$Species))*100
+summary(g1)
+summary(g2)
+summary(g3)
+```
+##### Para el caso del analisis de grupos, se tomo cada una de las variables analizadas anteriormente, se realizo un cluster con el algortimo de K-Means. Ademas se muestra en esta parte las variables que se consideran que si influyen en el precio de una casa y se muestran las medidas de tendencia central de cada una de las variables consideradas.
+
+
+Prueba 1
+La correlacion entre las variables independientes y los precios de venta:
+```{r}
+cor(train$YearBuilt, train$SalePrice, method = c("pearson", "kendall", "spearman"))
+cor(train$YearRemodAdd, train$SalePrice, method = c("pearson", "kendall", "spearman"))
+cor(train$TotalBsmtSF, train$SalePrice, method = c("pearson", "kendall", "spearman"))
+cor(train$X1stFlrSF, train$SalePrice, method = c("pearson", "kendall", "spearman"))
+cor(train$GrLivArea, train$SalePrice, method = c("pearson", "kendall", "spearman"))
+cor(train$TotRmsAbvGrd, train$SalePrice, method = c("pearson", "kendall", "spearman"))
+cor(train$GarageCars, train$SalePrice, method = c("pearson", "kendall", "spearman"))
+cor(train$GarageArea, train$SalePrice, method = c("pearson", "kendall", "spearman"))
+#Selected rows
+train <-select(datos,TotalBsmtSF,X1stFlrSF,GrLivArea,GarageCars,GarageArea,SalePrice)
+#Data cleanup
+train <- na.omit(train)
+#k-medias
+cluster <- train
+km<-kmeans(train,3)
+train$grupo<-km$cluster
+plotcluster(cluster,km$cluster) #grafica la ubicación de los clusters
+#Método de las siluetas para las k-medias
+silkm<-silhouette(km$cluster,dist(train))
+mean(silkm[,3]) #Siluetas de 0.562137
+```
+Prueba 2
+```{r}
+cor(train$TotalBsmtSF, train$SalePrice, method = c("pearson", "kendall", "spearman"))
+cor(train$X1stFlrSF, train$SalePrice, method = c("pearson", "kendall", "spearman"))
+cor(train$GrLivArea, train$SalePrice, method = c("pearson", "kendall", "spearman"))
+cor(train$GarageCars, train$SalePrice, method = c("pearson", "kendall", "spearman"))
+cor(train$GarageArea, train$SalePrice, method = c("pearson", "kendall", "spearman"))
+#Selected rows
+train <-select(datos,TotalBsmtSF,X1stFlrSF,GrLivArea,GarageCars,GarageArea,SalePrice)
+#Data cleanup
+train <- na.omit(train)
+#k-medias
+cluster <- train
+km<-kmeans(train,3)
+train$grupo<-km$cluster
+plotcluster(cluster,km$cluster) #grafica la ubicación de los clusters
+#Método de la silueta para las k-medias
+silkm<-silhouette(km$cluster,dist(train))
+mean(silkm[,3]) #Silueta de 0.562137
 ```
 
 ### 4. Divida el set de datos preprocesados en dos conjuntos: Entrenamiento y prueba. Describa el criterio que usó para crear los conjuntos: número de filas de cada uno, estratificado o no, balanceado o no, etc. Si le proveen un conjunto de datos de prueba y tiene suficientes datos, tómelo como de validación, pero haga sus propios conjuntos de prueba. 
@@ -93,13 +300,3 @@ R2 representa la correlación del modelo, mientras más cercano es el resultado 
 plot(train$SalePrice, col="green")
 ```
 Para discutir la efectividad del modelo podemos ver el summary del modelo (se encuentra al final de las graficas de correlacion, antes de las graficas de residuo), podemos ver que al final de toda la informacion tenemos Multiple R-squared, este nos dio un 0.8, el cual es parecido a la cantidad obtenida anteriormente en la tabla de analisis de varianza. Por lo que se puede decir que el modelo podria mejorarse pero es bastante bueno. 
-
-
-
-
-
-
-
-
-
-
